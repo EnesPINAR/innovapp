@@ -18,12 +18,13 @@ export default function LoginScreen() {
             return;
         }
         Alert.alert("Başarılı", `Hoş geldiniz, ${phone}!`);
-        router.replace("/(tabs)");
+        router.replace("/(tabs)/program");
     };
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Telefon ile Giriş Yap</Text>
+            <Text style={styles.title}>Innova App</Text>
+            <Text style={styles.title}>Hoşgeldiniz</Text>
             <TextInput
                 style={styles.input}
                 placeholder="Telefon Numarası"
@@ -31,7 +32,7 @@ export default function LoginScreen() {
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
-                maxLength={15} // Maksimum karakter sayısı
+                maxLength={15}
             />
             <TextInput
                 style={styles.input}
@@ -44,6 +45,7 @@ export default function LoginScreen() {
             <TouchableOpacity style={styles.button} onPress={handleLogin}>
                 <Text style={styles.buttonText}>Giriş Yap</Text>
             </TouchableOpacity>
+            <Text style={styles.passiveText}>Kayıt için kasaya başvurabilirsiniz.</Text>
         </View>
     );
 }
@@ -75,15 +77,20 @@ const styles = StyleSheet.create({
     button: {
         width: "100%",
         height: 50,
-        backgroundColor: "#007BFF",
+        backgroundColor: "#FFD60A",
         borderRadius: 8,
         justifyContent: "center",
         alignItems: "center",
         marginTop: 10,
     },
     buttonText: {
-        color: "#fff",
+        color: "#000",
         fontSize: 18,
         fontWeight: "bold",
+    },
+    passiveText: {
+        color: "#7B7B7B",
+        fontSize: 18,
+        marginTop: 20,
     },
 });
