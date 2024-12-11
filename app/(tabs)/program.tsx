@@ -1,16 +1,72 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Text, View, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import Collapsible from 'react-native-collapsible';
 import YoutubeIframe from 'react-native-youtube-iframe';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import api from '../../lib/axios';
+import LoadingSpinner from '../../components/LoadingSpinner';
+
+interface Movement {
+  id: number;
+  name: string;
+  video: string;
+  sets: number;
+  reps: number;
+}
+
+interface Program {
+  id: number;
+  name: string;
+  movements: Movement[];
+}
+
+interface User {
+  active: boolean;
+}
 
 export default function Program() {
     const [activeSections, setActiveSections] = useState<number[]>([]);
-    const rotateAnim = useRef(new Animated.Value(0)).current;
+    const [program, setProgram] = useState<Program[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [rotateAnims, setRotateAnims] = useState<Animated.Value[]>([]);
+    const [isActive, setIsActive] = useState<boolean>(false);
 
-    const toggleSection = (section: number) => {
-        const isActive = activeSections.includes(section);
-        Animated.timing(rotateAnim, {
+    useEffect(() => {
+        const fetchUserAndProgram = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                
+                const userResponse = await api.get<User[]>('/api/users/');
+                const isUserActive = userResponse.data[0].active;
+                setIsActive(isUserActive);
+
+                if (isUserActive) {
+                    const programResponse = await api.get<Program[]>('/api/programs/');
+                    setProgram(programResponse.data);
+                }
+                
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Bir hata oluştu');
+                console.error('Error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchUserAndProgram();
+    }, []);
+
+    useEffect(() => {
+        if (program && program[0]?.movements) {
+            setRotateAnims(program[0].movements.map(() => new Animated.Value(0)));
+        }
+    }, [program]);
+
+    const toggleSection = (index: number) => {
+        const isActive = activeSections.includes(index);
+        Animated.timing(rotateAnims[index], {
             toValue: isActive ? 0 : 1,
             duration: 300,
             useNativeDriver: true,
@@ -18,43 +74,73 @@ export default function Program() {
 
         setActiveSections((prevSections) =>
             isActive
-                ? prevSections.filter((s) => s !== section)
-                : [...prevSections, section]
+                ? prevSections.filter((s) => s !== index)
+                : [...prevSections, index]
         );
     };
 
-    const rotate = rotateAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '180deg'],
-    });
+    if (!isActive) {
+        return (
+            <View style={styles.container}>
+                <View style={[styles.infoBox, { marginTop: 20 }]}>
+                    <View style={styles.infoRow}>
+                        <Text style={styles.textPassive}>Görüntülemek için üyeliğinizi yenileyiniz.</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    if (isLoading) {
+        return <LoadingSpinner />;
+    }
+
+    if (error) {
+        return (
+            <View style={styles.container}>
+                <Text>Hata: {error}</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Push Pull Legs</Text>
-            <View>
-                <TouchableOpacity onPress={() => toggleSection(0)} style={styles.exerciseRow}>
-                    <Text style={styles.exerciseName}>Exercise Name</Text>
-                    <View style={styles.rightContent}>
-                        <Text style={styles.setText}>12 x 4</Text>
-                        <Animated.View style={{ transform: [{ rotate }] }}>
-                            <Ionicons 
-                                name="chevron-down" 
-                                size={24} 
-                                color="#666" 
-                            />
-                        </Animated.View>
-                    </View>
-                </TouchableOpacity>
-                <Collapsible collapsed={!activeSections.includes(0)}>
-                    <View style={styles.collapsibleContent}>
-                        <YoutubeIframe
-                            height={200}
-                            play={false}
-                            videoId={'EdDqD4aKwxM'} // Replace with your video ID
-                        />
-                    </View>
-                </Collapsible>
-            </View>
+            {program && program.length > 0 ? (
+                <>
+                    <Text style={styles.title}>{program[0].name}</Text>
+                    {program[0].movements.map((movement, index) => (
+                        <View key={movement.id}>
+                            <TouchableOpacity onPress={() => toggleSection(index)} style={styles.exerciseRow}>
+                                <Text style={styles.exerciseName}>{movement.name}</Text>
+                                <View style={styles.rightContent}>
+                                    <Text style={styles.setText}>{movement.reps} x {movement.sets}</Text>
+                                    <Animated.View style={{ transform: [{ 
+                                        rotate: rotateAnims[index]?.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: ['0deg', '180deg']
+                                        }) || '0deg'
+                                    }] }}>
+                                        <Ionicons name="chevron-down" size={24} color="#666" />
+                                    </Animated.View>
+                                </View>
+                            </TouchableOpacity>
+                            <Collapsible collapsed={!activeSections.includes(index)}>
+                                <View style={styles.collapsibleContent}>
+                                    <YoutubeIframe
+                                        height={200}
+                                        play={false}
+                                        videoId={movement.video.includes('/shorts/') 
+                                            ? movement.video.split('/shorts/')[1]
+                                            : movement.video.split('v=')[1]}
+                                    />
+                                </View>
+                            </Collapsible>
+                        </View>
+                    ))}
+                </>
+            ) : (
+                <Text>Size atanmış bir program bulunmamaktadır.</Text>
+            )}
         </View>
     );
 }
@@ -101,5 +187,35 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+    },
+    infoBox: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        marginHorizontal: 16,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ddd',
+    },
+    lastRow: {
+        borderBottomWidth: 0,
+    },
+    label: {
+        fontSize: 16,
+        color: '#333',
+    },
+    value: {
+        fontSize: 16,
+        color: '#333',
+    },
+    textPassive: {
+        fontSize: 16,
+        color: '#7B7B7B',
     },
 });

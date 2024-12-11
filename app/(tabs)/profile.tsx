@@ -1,14 +1,81 @@
-import React, { useState } from 'react';
-import { Text, View, StyleSheet, TextInput, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Text, View, StyleSheet, TextInput, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Alert } from 'react-native';
+import api from '../../lib/axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function Profile() {
-    const [height, setHeight] = useState('174');
-    const [weight, setWeight] = useState('74');
+    const [height, setHeight] = useState('');
+    const [weight, setWeight] = useState('');
+    const [userData, setUserData] = useState({
+        name: '',
+        age: '',
+        blood_type: '',
+        membership_days: '',
+    });
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        fetchUserData();
+    }, []);
+
+    const fetchUserData = async () => {
+        try {
+            setIsLoading(true);
+
+            const response = await api.get('/api/users/');
+            const data = response.data[0];
+            setHeight(data.height?.toString() || '');
+            setWeight(data.weight?.toString() || '');
+            setUserData({
+                name: `${data.first_name} ${data.last_name}`,
+                age: data.age?.toString() || '',
+                blood_type: data.blood_type || '',
+                membership_days: data.remaining_days?.toString() || '',
+            });
+        } catch (error) {
+            console.error('Error fetching user data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleUpdate = async () => {
+        try {
+            const token = await AsyncStorage.getItem('userToken');
+            const response = await api.get('/api/users/', {
+                headers: { 'Authorization': `Token ${token}` }
+            });
+            const userId = response.data[0].id;
+            
+            await api.patch(`/api/users/${userId}/`, {
+                height: parseInt(height),
+                weight: parseInt(weight),
+            }, {
+                headers: { 'Authorization': `Token ${token}` }
+            });
+            
+            await fetchUserData();
+            Alert.alert('Başarılı', 'Profil güncellendi');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error('Full error:', error.response?.data);
+                console.error('Status:', error.response?.status);
+                console.error('Headers:', error.response?.headers);
+            }
+            Alert.alert('Hata', 'Profil güncellenirken bir hata oluştu');
+        }
+    };
+
+    if (isLoading) {
+        return <LoadingSpinner />;
+    }
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.container}>
-                <Text style={styles.name}>İsim SOYİSİM</Text>
+                <Text style={styles.name}>{userData.name}</Text>
                 <View style={styles.infoBox}>
                     <View style={styles.infoRow}>
                         <Text style={styles.label}>Boy</Text>
@@ -30,18 +97,22 @@ export default function Profile() {
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.label}>Yaş</Text>
-                        <Text style={styles.textPassive}>21</Text>
+                        <Text style={styles.textPassive}>{userData.age}</Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.label}>Kan Grubu</Text>
-                        <Text style={styles.textPassive}>A RH+</Text>
+                        <Text style={styles.textPassive}>{userData.blood_type}</Text>
                     </View>
                     <View style={[styles.infoRow, styles.lastRow]}>
                         <Text style={styles.label}>Kalan Üyelik Süresi</Text>
-                        <Text style={styles.textPassive}>9 Gün</Text>
+                        <Text style={styles.textPassive}>
+                            {parseInt(userData.membership_days) < 0 
+                                ? `${Math.abs(parseInt(userData.membership_days))} gün önce bitti`
+                                : `${userData.membership_days} Gün`}
+                        </Text>
                     </View>
                 </View>
-                <TouchableOpacity style={styles.button}>
+                <TouchableOpacity style={styles.button} onPress={handleUpdate}>
                     <Text style={styles.buttonText}>Güncelle</Text>
                 </TouchableOpacity>
             </View>
