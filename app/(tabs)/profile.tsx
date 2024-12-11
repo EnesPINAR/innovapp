@@ -4,6 +4,7 @@ import api from '../../lib/axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { router } from 'expo-router';
 
 export default function Profile() {
     const [height, setHeight] = useState('');
@@ -68,6 +69,21 @@ export default function Profile() {
         }
     };
 
+    const handleLogout = async () => {
+        try {
+            const token = await AsyncStorage.getItem('userToken');
+            await api.post('/api/logout/', {}, {
+                headers: { 'Authorization': `Token ${token}` }
+            });
+            
+            await AsyncStorage.removeItem('userToken');
+            router.replace('/(auth)/login');
+            
+        } catch (error) {
+            console.error('Logout failed:', error);
+        }
+    };
+
     if (isLoading) {
         return <LoadingSpinner />;
     }
@@ -114,6 +130,9 @@ export default function Profile() {
                 </View>
                 <TouchableOpacity style={styles.button} onPress={handleUpdate}>
                     <Text style={styles.buttonText}>Güncelle</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
                 </TouchableOpacity>
             </View>
         </TouchableWithoutFeedback>
@@ -179,8 +198,21 @@ const styles = StyleSheet.create({
         marginTop: 10,
         marginHorizontal: 16,
     },
+    logoutButton: {
+        height: 50,
+        backgroundColor: "#FF0000",
+        borderRadius: 8,
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 10,
+        marginHorizontal: 16,
+    },
     buttonText: {
         color: "#000",
+        fontSize: 18,
+    },
+    logoutButtonText: {
+        color: "#fff",
         fontSize: 18,
     },
 });
